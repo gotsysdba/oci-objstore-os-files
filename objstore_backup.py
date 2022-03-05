@@ -8,7 +8,7 @@ import glob, time, math, multiprocessing
 from datetime import timedelta
 from oci.object_storage.transfer.constants import MEBIBYTE
 
-
+_success = 1
 ##########################################################################
 # Print header centered
 ##########################################################################
@@ -80,6 +80,7 @@ def delete_from_object_storage(client, namespace, bucket, path):
 # upload_to_object_storage
 ##############################################################################
 def upload_to_object_storage(client, namespace, bucket, path, cpu=1):
+  global _success
   # Note using UploadManager instead of put_object for multipart
   file_size = os.stat(path).st_size
   if file_size > (1024 * MEBIBYTE):
@@ -99,27 +100,39 @@ def upload_to_object_storage(client, namespace, bucket, path, cpu=1):
     print(str(timedelta(seconds=time.time() - start_time)))
   except PermissionError:
     print("Failed - Unable to read local file")
+    _success = 0
   except FileNotFoundError:
     print("Failed - File Not Found")
+    _success = 0
   except OSError as e:
     print("Failed - {}".format(e))
-
+    _success = 0
 
 ##############################################################################
 # download_from_object_storage
 ##############################################################################
-def download_from_object_storage(client, namespace, bucket, path, out_file=None):
-  get_obj = client.get_object(namespace, bucket, path)
-  if out_file:
-    out_file = os.path.normpath(out_file+path)
-  else:
-    out_file = path
+def download_from_object_storage(client, namespace, bucket, src, path, dst=None):
+  global _success
+  base = path.replace(src,'')
+  if not base:
+    base = os.path.basename(path)
 
-  os.makedirs(os.path.dirname(out_file), exist_ok=True)
+  try:
+    dst = os.path.normpath(dst+base)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+  except:
+    dst = os.path.normpath('./'+base)
+  print("Downloading {} to {}".format(path, dst), end=": ", flush=True)
 
-  print("Downloading {} to {}".format(path, out_file), end=": ", flush=True)
+  try:
+    get_obj = client.get_object(namespace, bucket, path)
+  except Exception as e:
+    print("Failed - {}".format(e.message))
+    _success = 0
+    return
+
   start_time = time.time()
-  with open(out_file, 'wb') as f:
+  with open(dst, 'wb') as f:
     for chunk in get_obj.data.raw.stream(1024 * 1024, decode_content=False):
         f.write(chunk)
     print(str(timedelta(seconds=time.time() - start_time)))
@@ -128,6 +141,7 @@ def download_from_object_storage(client, namespace, bucket, path, out_file=None)
 # MAIN
 ##############################################################################
 if __name__ == "__main__":
+  start_time = time.time()
   parser = argparse.ArgumentParser(description='Object Store Filesystem Utilities')
   parser.add_argument('-a', required=True,  dest='action', choices=['upload', 'download','list','delete'], help="Action")
   parser.add_argument('-b', required=False, default=None, dest='bucket', help='Bucket Name')
@@ -159,8 +173,8 @@ if __name__ == "__main__":
     raise SystemExit('-b <bucket> is requiered')
   if args.action == 'upload' and not src:
     raise SystemExit('For -a upload, -s <src> is required')
-  if args.action == 'download' and not src and not dst:
-    raise SystemExit('For -a download, -s <src> and -d <dst> is required')
+  if args.action == 'download' and not src:
+    raise SystemExit('For -a download, -s <src> is required')
     
   # Establish the ObjStorage Client
   object_storage_client = oci.object_storage.ObjectStorageClient(config, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
@@ -173,6 +187,8 @@ if __name__ == "__main__":
   objects = {}
   objects = list_object_storage(object_storage_client, namespace, bucket, src)
 
+  # Set successful 
+  _success=1
   if args.action == 'list':
     print_header("Listing Objects in {} Bucket".format(bucket))
     for file in objects:
@@ -185,8 +201,10 @@ if __name__ == "__main__":
 
   if args.action == 'download':
     print_header("Downloading from Object Storage")
+    if dst and not dst.endswith('/'):
+      dst = dst + '/'
     for file in objects:
-      download_from_object_storage(object_storage_client, namespace, bucket, file, dst)
+      download_from_object_storage(object_storage_client, namespace, bucket, src, file, dst)
 
   if args.action == 'upload':
     parallel = multiprocessing.cpu_count()
@@ -213,3 +231,8 @@ if __name__ == "__main__":
         continue
       full_path=os.path.abspath(filePath)
       upload_to_object_storage(upload_manager, namespace, bucket, full_path, parallel)
+
+  elapsed_time = str(timedelta(seconds=time.time() - start_time))
+  if not _success:
+    raise SystemExit(print_header("Failures Detected; See Output ({})".format(elapsed_time)))
+  print_header("Success; No Failures Detected ({})".format(elapsed_time))
