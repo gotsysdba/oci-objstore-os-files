@@ -119,10 +119,14 @@ def download_from_object_storage(client, namespace, bucket, src, path, dst=None)
 
   try:
     dst = os.path.normpath(dst+base)
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
   except:
     dst = os.path.normpath('./'+base)
   print("Downloading {} to {}".format(path, dst), end=": ", flush=True)
+
+  try:
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+  except FileNotFoundError:
+    pass
 
   try:
     get_obj = client.get_object(namespace, bucket, path)
