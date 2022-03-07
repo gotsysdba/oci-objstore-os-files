@@ -79,10 +79,10 @@ def delete_from_object_storage(client, namespace, bucket, path):
 ##############################################################################
 # upload_to_object_storage
 ##############################################################################
-def upload_to_object_storage(client, namespace, bucket, path, cpu=1):
+def upload_to_object_storage(client, namespace, bucket, src, dst, cpu=1):
   global _success
   # Note using UploadManager instead of put_object for multipart
-  file_size = os.stat(path).st_size
+  file_size = os.stat(src).st_size
   if file_size > (1024 * MEBIBYTE):
     part_bytes = math.floor(file_size/(35*cpu))
   else:
@@ -93,10 +93,16 @@ def upload_to_object_storage(client, namespace, bucket, path, cpu=1):
   except ZeroDivisionError:
     part_count = 1
 
+  if dst:
+    base = os.path.basename(src)
+    dst = os.path.normpath(dst+base)
+  else:
+    dst = src
+
   try:
-    print("Uploading {} [{} part(s)]".format(path,part_count), end=": ", flush=True)
+    print("Uploading {} to {} [{} part(s)]".format(src,dst,part_count), end=": ", flush=True)
     start_time = time.time()
-    client.upload_file(namespace, bucket, path, path, part_size=part_bytes)
+    client.upload_file(namespace, bucket, dst, src, part_size=part_bytes)
     print(str(timedelta(seconds=time.time() - start_time)))
   except PermissionError:
     print("Failed - Unable to read local file")
@@ -233,8 +239,8 @@ if __name__ == "__main__":
       mode = os.stat(filePath).st_mode
       if stat.S_ISSOCK(mode) or stat.S_ISFIFO(mode):
         continue
-      full_path=os.path.abspath(filePath)
-      upload_to_object_storage(upload_manager, namespace, bucket, full_path, parallel)
+      src_path=os.path.abspath(filePath)
+      upload_to_object_storage(upload_manager, namespace, bucket, src_path, dst, parallel)
 
   elapsed_time = str(timedelta(seconds=time.time() - start_time))
   if not _success:
