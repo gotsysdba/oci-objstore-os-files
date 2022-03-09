@@ -176,8 +176,12 @@ if __name__ == "__main__":
   # Test for input overrides and config values
   bucket = set_value('bucket', args.bucket, config)
   proxy  = set_value('proxy', args.proxy, config)
-  src    = set_value('src', args.src, config)
   dst    = set_value('dst', args.dst, config)
+  # Concat config src with args.src
+  if config['src'] and args.src:
+    src = os.path.join(config['src'], args.src)
+  else:
+    src = set_value('src', args.src, config)
 
   if not bucket:
     raise SystemExit('-b <bucket> is requiered')
