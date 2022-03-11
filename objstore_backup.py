@@ -177,11 +177,13 @@ if __name__ == "__main__":
   bucket = set_value('bucket', args.bucket, config)
   proxy  = set_value('proxy', args.proxy, config)
   dst    = set_value('dst', args.dst, config)
-  # Concat config src with args.src
-  if config['src'] and args.src:
+  src    = set_value('src', args.src, config)
+
+  # Override src with concat config src with args.src when both exists 
+  try:
     src = os.path.join(config['src'], args.src)
-  else:
-    src = set_value('src', args.src, config)
+  except:
+    pass
 
   if not bucket:
     raise SystemExit('-b <bucket> is requiered')
@@ -240,11 +242,15 @@ if __name__ == "__main__":
       if os.path.isdir(filePath):
         continue
       # Skip socket files
-      mode = os.stat(filePath).st_mode
-      if stat.S_ISSOCK(mode) or stat.S_ISFIFO(mode):
-        continue
-      src_path=os.path.abspath(filePath)
-      upload_to_object_storage(upload_manager, namespace, bucket, src_path, dst, parallel)
+      try:
+        mode = os.stat(filePath).st_mode
+        if stat.S_ISSOCK(mode) or stat.S_ISFIFO(mode):
+          continue
+        src_path=os.path.abspath(filePath)
+        if os.path.getsize(src_path) > 0:
+          upload_to_object_storage(upload_manager, namespace, bucket, src_path, dst, parallel)
+      except FileNotFoundError:
+        pass
 
   elapsed_time = str(timedelta(seconds=time.time() - start_time))
   if not _success:
