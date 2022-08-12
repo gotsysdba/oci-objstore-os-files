@@ -148,11 +148,11 @@ Use the -a list to find the full path of the object storage file, then pass to -
 * Download Recursive Directory: 
     * `python3 ./objstore_backup.py -a download -t cloud-backup-demo -b FILESYSTEM -s /u01/app/datapump/db1 -d /u01/app/datapump/db1_new`
 * Download Single File: 
-    * `python3 ./objstore_backup.py -a upload -t cloud-backup-demo -b FILESYSTEM -s /u01/app/datapump/db1/file01.dmp -d /u01/app/datapump/db1_new/file01.dmp`
+    * `python3 ./objstore_backup.py -a download -t cloud-backup-demo -b FILESYSTEM -s /u01/app/datapump/db1/file01.dmp -d /u01/app/datapump/db1_new/file01.dmp`
 
 ## Delete
 Use the -a list to find the full path of the object storage file, then pass to -s
 * Delete Recursive Directory: 
     * `python3 ./objstore_backup.py -a delete -t cloud-backup-demo -b FILESYSTEM -s /u01/app/datapump/db1`
-* Download Single File: 
-    * `python3 ./objstore_backup.py -a upload -t cloud-backup-demo -b FILESYSTEM -s /u01/app/datapump/db1/file01.dmp`
+* Delete Single File: 
+    * `python3 ./objstore_backup.py -a delete -t cloud-backup-demo -b FILESYSTEM -s /u01/app/datapump/db1/file01.dmp`
